@@ -1,11 +1,9 @@
-// netlify/functions/deepseek-chat.js
-// Node 18+ runtime on Netlify. Keeps your DeepSeek API key server-side.
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-
-// Prefer the common OpenAI-compatible path first:
-const DEEPSEEK_URL = "https://api.deepseek.com/v1/chat/completions";
-// If your account uses the non-v1 path, change to:
-// const DEEPSEEK_URL = "https://api.deepseek.com/chat/completions";
+// Supports DeepSeek native OR OpenRouter (choose via LLM_PROVIDER).
+// Env:
+//   LLM_PROVIDER = "deepseek" | "openrouter"
+//   DEEPSEEK_API_KEY = <native key>     (for deepseek)
+//   OPENROUTER_API_KEY = <sk-or-v1-...> (for openrouter)
+//   PUBLIC_BASE_URL = https://<yoursite>.netlify.app (optional, for OpenRouter headers)
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,83 +11,103 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
 
+const PROVIDER = (process.env.LLM_PROVIDER || "deepseek").toLowerCase();
+
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") {
     return { statusCode: 204, headers: corsHeaders, body: "" };
   }
-
   if (event.httpMethod !== "POST") {
-    return {
-      statusCode: 405,
-      headers: corsHeaders,
-      body: JSON.stringify({ error: "Method Not Allowed" }),
-    };
+    return { statusCode: 405, headers: corsHeaders, body: JSON.stringify({ error: "Method Not Allowed" }) };
   }
 
   try {
-    if (!DEEPSEEK_API_KEY) {
-      return {
-        statusCode: 500,
-        headers: corsHeaders,
-        body: JSON.stringify({
-          error: "Missing DEEPSEEK_API_KEY in Netlify environment variables.",
-        }),
-      };
-    }
-
-    const { messages, model = "deepseek-chat", temperature = 0.7 } = JSON.parse(
-      event.body || "{}"
-    );
+    const { messages, model: modelIn = "deepseek-chat", temperature = 0.7 } =
+      JSON.parse(event.body || "{}");
 
     if (!Array.isArray(messages) || messages.length === 0) {
-      return {
-        statusCode: 400,
-        headers: corsHeaders,
-        body: JSON.stringify({ error: "Request must include a messages array." }),
-      };
+      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: "messages[] required" }) };
     }
 
-    const resp = await fetch(DEEPSEEK_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${DEEPSEEK_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature,
-        stream: false, // keep simple; we'll simulate typing on the client
-      }),
-    });
+    if (PROVIDER === "openrouter") {
+      // ---- OpenRouter path ----
+      const key = (process.env.OPENROUTER_API_KEY || "").trim();
+      if (!key) {
+        return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: "OPENROUTER_API_KEY missing" }) };
+      }
 
-    const data = await resp.json();
+      // Map DeepSeek model names to OpenRouter names
+      const modelMap = {
+        "deepseek-chat": "deepseek/deepseek-chat",
+        "deepseek-reasoner": "deepseek/deepseek-reasoner",
+        "deepseek-coder": "deepseek/deepseek-coder",
+      };
+      const model = modelMap[modelIn] || modelIn;
 
+      const referer =
+        process.env.PUBLIC_BASE_URL ||
+        event.headers.origin ||
+        `https://${event.headers["x-forwarded-host"] || "localhost"}`;
+      const title = "DeepSeek Chat (OpenRouter)";
+
+      const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${key}`,
+          "Content-Type": "application/json",
+          "HTTP-Referer": referer, // OpenRouter recommends these
+          "X-Title": title,
+        },
+        body: JSON.stringify({
+          model,
+          messages,
+          temperature,
+          stream: false,
+        }),
+      });
+
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        return {
+          statusCode: resp.status,
+          headers: corsHeaders,
+          body: JSON.stringify({ error: data?.error || "OpenRouter error", details: data }),
+        };
+      }
+      const reply = data?.choices?.[0]?.message?.content ?? "";
+      return { statusCode: 200, headers: { "Content-Type": "application/json", ...corsHeaders }, body: JSON.stringify({ reply, usage: data?.usage || null }) };
+    }
+
+    // ---- DeepSeek native path ----
+    const deepseekKey = (process.env.DEEPSEEK_API_KEY || "").trim();
+    if (!deepseekKey) {
+      return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: "DEEPSEEK_API_KEY missing" }) };
+    }
+
+    // Try v1 first, then legacy
+    const tryOnce = async (url) =>
+      fetch(url, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${deepseekKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model: modelIn, messages, temperature, stream: false }),
+      });
+
+    let resp = await tryOnce("https://api.deepseek.com/v1/chat/completions");
+    if (resp.status === 404 || resp.status === 400) {
+      resp = await tryOnce("https://api.deepseek.com/chat/completions");
+    }
+
+    const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
       return {
         statusCode: resp.status,
         headers: corsHeaders,
-        body: JSON.stringify({
-          error: "DeepSeek API error",
-          status: resp.status,
-          details: data,
-        }),
+        body: JSON.stringify({ error: data?.error?.message || "DeepSeek API error", details: data }),
       };
     }
-
     const reply = data?.choices?.[0]?.message?.content ?? "";
-    const usage = data?.usage ?? null;
-
-    return {
-      statusCode: 200,
-      headers: { "Content-Type": "application/json", ...corsHeaders },
-      body: JSON.stringify({ reply, usage }),
-    };
+    return { statusCode: 200, headers: { "Content-Type": "application/json", ...corsHeaders }, body: JSON.stringify({ reply, usage: data?.usage || null }) };
   } catch (err) {
-    return {
-      statusCode: 500,
-      headers: corsHeaders,
-      body: JSON.stringify({ error: "Server error", details: String(err) }),
-    };
+    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: "Server error", details: String(err) }) };
   }
 };
