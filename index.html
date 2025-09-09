@@ -3,21 +3,18 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>IAS SUPER 30 – DeepSeek Chat</title>
+  <title>IAS SUPER 30 – DeepSeek (OpenRouter)</title>
   <style>
-    :root{
-      --bg:#0f172a; --panel:#0b1220; --border:#1f2937; --text:#e5e7eb; --muted:#94a3b8;
-      --accent:#22d3ee; --accent2:#a78bfa; --danger:#ef4444; --ok:#22c55e;
-    }
+    :root{ --bg:#0f172a; --panel:#0b1220; --border:#1f2937; --text:#e5e7eb; --muted:#94a3b8;
+           --accent:#22d3ee; --accent2:#a78bfa; --ok:#22c55e; }
     *{ box-sizing:border-box }
-    body{
-      margin:0; color:var(--text); background:radial-gradient(100vh 80vh at 10% 0%, #0a0f1f, #0f172a 60%),
-                                   radial-gradient(120vh 90vh at 100% 10%, #0a0f1f, #0f172a 50%);
+    body{ margin:0; color:var(--text);
+      background:radial-gradient(100vh 80vh at 10% 0%, #0a0f1f, #0f172a 60%),
+                 radial-gradient(120vh 90vh at 100% 10%, #0a0f1f, #0f172a 50%);
       font:15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Inter, Arial, sans-serif;
       height:100dvh; display:grid; grid-template-rows:auto 1fr auto;
     }
-    header{
-      display:flex; align-items:center; gap:12px; padding:14px 16px;
+    header{ display:flex; align-items:center; gap:12px; padding:14px 16px;
       border-bottom:1px solid var(--border);
       background:linear-gradient(180deg, rgba(255,255,255,.03), transparent);
       position:sticky; top:0; z-index:10;
@@ -31,8 +28,7 @@
     #chat{ padding:16px; max-width:900px; margin:0 auto; width:100%; overflow:auto }
     .msg{ display:grid; grid-template-columns:40px 1fr; gap:12px; padding:14px; margin:8px 0;
       border:1px solid var(--border); border-radius:16px; background:rgba(11,18,32,.6);
-      box-shadow:0 6px 18px rgba(0,0,0,.15);
-    }
+      box-shadow:0 6px 18px rgba(0,0,0,.15); }
     .msg.user{ background:rgba(2,6,23,.45) }
     .avatar{ width:40px; height:40px; border-radius:12px; display:grid; place-items:center;
       background:#0b1020; border:1px solid var(--border); color:#cbd5e1; font-weight:700 }
@@ -46,135 +42,116 @@
 
     form#composer{ border-top:1px solid var(--border); display:grid; grid-template-columns:1fr auto; gap:10px;
       padding:16px; background:linear-gradient(0deg, rgba(255,255,255,.03), transparent) }
-    textarea{
-      width:100%; min-height:56px; max-height:220px; resize:vertical;
-      background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:14px;
-      padding:12px 14px; outline:none;
-    }
+    textarea{ width:100%; min-height:56px; max-height:220px; resize:vertical;
+      background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:14px; padding:12px 14px; outline:none; }
     textarea:focus{ box-shadow:inset 0 0 0 1px var(--accent); border-color:var(--accent) }
-    button{
-      padding:12px 16px; border-radius:14px; border:1px solid var(--border);
-      background:linear-gradient(135deg,#0b1220,#111827); color:var(--text); cursor:pointer; font-weight:700
-    }
+    button{ padding:12px 16px; border-radius:14px; border:1px solid var(--border);
+      background:linear-gradient(135deg,#0b1220,#111827); color:var(--text); cursor:pointer; font-weight:700 }
     button:hover{ transform:translateY(-1px); box-shadow:0 6px 18px rgba(0,0,0,.25) }
     .hint{ font-size:12px; color:var(--muted); text-align:center; margin:6px 0 12px }
-    .error{ color:#fecaca }
   </style>
 </head>
 <body>
-<header>
-  <div class="logo" aria-hidden="true"></div>
-  <div class="title">IAS SUPER 30 – DeepSeek</div>
-  <div class="status"><span class="dot"></span> ready</div>
-</header>
+  <header>
+    <div class="logo" aria-hidden="true"></div>
+    <div class="title">IAS SUPER 30 – DeepSeek (OpenRouter)</div>
+    <div class="status"><span class="dot"></span> ready</div>
+  </header>
 
-<div id="chat" role="log" aria-live="polite" aria-busy="false"></div>
-<div class="toolbar">
-  <div id="clearBtn" class="pill" title="Clear conversation">Clear</div>
-  <div id="exportBtn" class="pill" title="Download conversation JSON">Export</div>
-</div>
+  <div id="chat" role="log" aria-live="polite" aria-busy="false"></div>
+  <div class="toolbar">
+    <div id="clearBtn" class="pill" title="Clear conversation">Clear</div>
+    <div id="exportBtn" class="pill" title="Download conversation JSON">Export</div>
+  </div>
 
-<form id="composer">
-  <textarea id="input" placeholder="Ask anything… (Shift+Enter = new line)"></textarea>
-  <button id="sendBtn" type="submit">Send ⮕</button>
-</form>
-<div class="hint">Your key stays on the server (Netlify Function). Frontend calls <code>/api/chat</code>.</div>
+  <form id="composer">
+    <textarea id="input" placeholder="Ask anything… (Shift+Enter = new line)"></textarea>
+    <button id="sendBtn" type="submit">Send ⮕</button>
+  </form>
+  <div class="hint">Frontend → <code>/api/chat</code> → Netlify Function → OpenRouter → DeepSeek V3.1 (free)</div>
 
-<script>
-  const chatEl = document.getElementById("chat");
-  const inputEl = document.getElementById("input");
-  const formEl = document.getElementById("composer");
-  const clearBtn = document.getElementById("clearBtn");
-  const exportBtn = document.getElementById("exportBtn");
+  <script>
+    const chatEl = document.getElementById("chat");
+    const inputEl = document.getElementById("input");
+    const formEl = document.getElementById("composer");
+    const clearBtn = document.getElementById("clearBtn");
+    const exportBtn = document.getElementById("exportBtn");
 
-  const systemMessage = { role: "system", content: "You are a helpful, concise assistant." };
-  let messages = [systemMessage];
+    const systemMessage = { role: "system", content: "You are a helpful, concise assistant." };
+    let messages = [systemMessage];
 
-  // Restore from localStorage
-  (function restore() {
-    const raw = localStorage.getItem("ias_super_30_msgs");
-    if (!raw) return;
-    try {
-      messages = JSON.parse(raw);
-      for (const m of messages) if (m.role !== "system") renderMessage(m.role, m.content);
-    } catch {}
-  })();
+    // restore history
+    (function restore(){
+      const raw = localStorage.getItem("ias_super_30_msgs");
+      if (!raw) return;
+      try { messages = JSON.parse(raw); for (const m of messages) if (m.role !== "system") renderMessage(m.role, m.content); } catch {}
+    })();
 
-  function save() { localStorage.setItem("ias_super_30_msgs", JSON.stringify(messages)); }
-  function scrollToBottom() { chatEl.scrollTop = chatEl.scrollHeight; }
-
-  function renderMessage(role, content) {
-    const root = document.createElement("div");
-    root.className = `msg ${role}`;
-    const avatar = document.createElement("div");
-    avatar.className = `avatar ${role === "assistant" ? "ai" : ""}`;
-    avatar.textContent = role === "assistant" ? "AI" : "You";
-    const bubble = document.createElement("div");
-    bubble.className = "bubble";
-    bubble.textContent = content;
-    root.appendChild(avatar); root.appendChild(bubble);
-    chatEl.appendChild(root); scrollToBottom();
-    return bubble;
-  }
-
-  async function typeInto(el, text, speed = 1) {
-    if (speed <= 0) { el.textContent = text; return; }
-    el.textContent = "";
-    for (let i = 0; i < text.length; i++) {
-      el.textContent += text[i];
-      if (i % 2 === 0) await new Promise(r => setTimeout(r, 6));
+    function save(){ localStorage.setItem("ias_super_30_msgs", JSON.stringify(messages)); }
+    function scrollToBottom(){ chatEl.scrollTop = chatEl.scrollHeight; }
+    function renderMessage(role, content){
+      const root = document.createElement("div");
+      root.className = `msg ${role}`;
+      const avatar = document.createElement("div");
+      avatar.className = `avatar ${role === "assistant" ? "ai" : ""}`;
+      avatar.textContent = role === "assistant" ? "AI" : "You";
+      const bubble = document.createElement("div");
+      bubble.className = "bubble";
+      bubble.textContent = content;
+      root.appendChild(avatar); root.appendChild(bubble);
+      chatEl.appendChild(root); scrollToBottom();
+      return bubble;
     }
-  }
+    async function typeInto(el, text, speed = 1){
+      if (speed <= 0) { el.textContent = text; return; }
+      el.textContent = "";
+      for (let i=0; i<text.length; i++){ el.textContent += text[i]; if (i%2===0) await new Promise(r=>setTimeout(r,6)); }
+    }
+    inputEl.addEventListener("keydown", (e)=>{ if (e.key==="Enter" && !e.shiftKey){ e.preventDefault(); formEl.requestSubmit(); } });
 
-  inputEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); formEl.requestSubmit(); }
-  });
+    formEl.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const content = inputEl.value.trim();
+      if (!content) return;
 
-  formEl.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const content = inputEl.value.trim();
-    if (!content) return;
-
-    renderMessage("user", content);
-    messages.push({ role: "user", content });
-    save();
-    inputEl.value = ""; inputEl.focus();
-
-    const placeholder = renderMessage("assistant", "…");
-    try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages, model: "deepseek-chat", temperature: 0.7 }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) {
-        const err = data?.error || "Request failed";
-        await typeInto(placeholder, `⚠️ ${typeof err === "string" ? err : JSON.stringify(err)}`, 0);
-        return;
-      }
-
-      const reply = data.reply || "";
-      await typeInto(placeholder, reply, 1);
-      messages.push({ role: "assistant", content: reply });
+      renderMessage("user", content);
+      messages.push({ role: "user", content });
       save();
-    } catch (err) {
-      await typeInto(placeholder, `⚠️ Network error: ${String(err)}`, 0);
-    }
-  });
+      inputEl.value = ""; inputEl.focus();
 
-  clearBtn.addEventListener("click", () => {
-    if (!confirm("Clear this conversation?")) return;
-    messages = [systemMessage]; save(); chatEl.innerHTML = "";
-  });
+      const placeholder = renderMessage("assistant", "…");
+      try {
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages,
+            // IMPORTANT: OpenRouter model slug (free route)
+            model: "deepseek/deepseek-chat-v3.1:free",
+            temperature: 0.7
+          }),
+        });
 
-  exportBtn.addEventListener("click", () => {
-    const blob = new Blob([JSON.stringify(messages, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = Object.assign(document.createElement("a"), { href: url, download: `ias-super-30-${new Date().toISOString().slice(0,19)}.json` });
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-  });
-</script>
-</body>
-</html>
+        const data = await res.json();
+        if (!res.ok) {
+          const err = data?.error || "Request failed";
+          await typeInto(placeholder, `⚠️ ${typeof err === "string" ? err : JSON.stringify(err)}`, 0);
+          return;
+        }
+
+        const reply = data.reply || "";
+        await typeInto(placeholder, reply, 1);
+        messages.push({ role: "assistant", content: reply });
+        save();
+      } catch (err) {
+        await typeInto(placeholder, `⚠️ Network error: ${String(err)}`, 0);
+      }
+    });
+
+    clearBtn.addEventListener("click", () => {
+      if (!confirm("Clear this conversation?")) return;
+      messages = [systemMessage]; save(); chatEl.innerHTML = "";
+    });
+    exportBtn.addEventListener("click", () => {
+      const blob = new Blob([JSON.stringify(messages, null, 2)], { type:"application/json" });
+      const
