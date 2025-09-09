@@ -1,8 +1,0 @@
-[build]
-  publish = "."
-  functions = "netlify/functions"
-
-[[redirects]]
-  from = "/api/chat"
-  to = "/.netlify/functions/deepseek-chat"
-  status = 200
