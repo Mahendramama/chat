@@ -1,17 +1,14 @@
-// Netlify Function: calls DeepSeek (native) Chat Completions
-// Env needed (Netlify → Site settings → Environment variables):
-//   DEEPSEEK_API_KEY = <your deepseek native key>  (NOT sk-or-v1-...)
+// Calls OpenRouter chat completions using your sk-or-v1-... key.
+// Netlify env vars required:
+//   OPENROUTER_API_KEY = sk-or-v1-xxxxxxxx
 // Optional:
-//   DEEPSEEK_API_URL = https://api.deepseek.com/v1/chat/completions  (or legacy)
+//   PUBLIC_BASE_URL = https://<your-site>.netlify.app  (used for recommended headers)
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, Authorization",
 };
-
-const firstUrl = () =>
-  (process.env.DEEPSEEK_API_URL || "https://api.deepseek.com/v1/chat/completions").trim();
 
 exports.handler = async (event) => {
   if (event.httpMethod === "OPTIONS") {
@@ -22,46 +19,49 @@ exports.handler = async (event) => {
   }
 
   try {
-    const key = (process.env.DEEPSEEK_API_KEY || "").trim();
-    if (!key || key.startsWith("sk-or-")) {
-      return {
-        statusCode: 500,
-        headers: corsHeaders,
-        body: JSON.stringify({
-          error:
-            "Server is missing a valid DeepSeek *native* API key. Add DEEPSEEK_API_KEY in Netlify (not an OpenRouter key).",
-        }),
-      };
+    const key = (process.env.OPENROUTER_API_KEY || "").trim();
+    if (!key) {
+      return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: "OPENROUTER_API_KEY missing" }) };
     }
 
-    const { messages, model = "deepseek-chat", temperature = 0.7 } = JSON.parse(event.body || "{}");
+    const { messages, model = "deepseek/deepseek-chat-v3.1:free", temperature = 0.7 } =
+      JSON.parse(event.body || "{}");
     if (!Array.isArray(messages) || messages.length === 0) {
-      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: "messages[] is required" }) };
+      return { statusCode: 400, headers: corsHeaders, body: JSON.stringify({ error: "messages[] required" }) };
     }
 
-    const call = async (url) =>
-      fetch(url, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ model, messages, temperature, stream: false }),
-      });
+    const referer =
+      process.env.PUBLIC_BASE_URL ||
+      event.headers.origin ||
+      `https://${event.headers["x-forwarded-host"] || "localhost"}`;
 
-    // Try v1 first, then legacy once
-    let url = firstUrl();
-    let resp = await call(url);
-    if (resp.status === 404 || resp.status === 400) {
-      const alt = "https://api.deepseek.com/chat/completions";
-      if (url !== alt) resp = await call(alt);
-    }
+    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        // Recommended headers for OpenRouter
+        "HTTP-Referer": referer,
+        "X-Title": "IAS SUPER 30 Chat",
+      },
+      body: JSON.stringify({
+        model,
+        messages,
+        temperature,
+        stream: false
+      }),
+    });
 
     const data = await resp.json().catch(() => ({}));
 
     if (!resp.ok) {
-      const msg = data?.error?.message || "DeepSeek API error";
       return {
         statusCode: resp.status,
         headers: corsHeaders,
-        body: JSON.stringify({ error: msg, status: resp.status, details: data }),
+        body: JSON.stringify({
+          error: data?.error || "OpenRouter error",
+          details: data
+        }),
       };
     }
 
@@ -74,6 +74,10 @@ exports.handler = async (event) => {
       body: JSON.stringify({ reply, usage }),
     };
   } catch (err) {
-    return { statusCode: 500, headers: corsHeaders, body: JSON.stringify({ error: "Server error", details: String(err) }) };
+    return {
+      statusCode: 500,
+      headers: corsHeaders,
+      body: JSON.stringify({ error: "Server error", details: String(err) }),
+    };
   }
 };
